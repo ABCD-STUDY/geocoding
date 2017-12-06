@@ -311,7 +311,7 @@ partial_join <- function(x, y, by_x, pattern_y) {
 # Constraint ACS only in the census tract level
 final <- partial_join(fc_clean@data, adi_df[which(nchar(adi_df$GEOID_NUM) == 11),], by_x="GEOID10", pattern_y="GEOID_NUM")
 # ADI summary score need scaling
-excludevec <- names(final) %in% c('GEOID_NUM')
+excludevec <- names(final) %in% c('LOGRECNO','GEOID','GEOID_NUM')
 final <- final[!excludevec]
 final$ADI_perc <- cut(final$ADI_wSUM, 
                   breaks=quantile(final$ADI_wSUM, seq(0,1, length.out=101), na.rm=TRUE), 
