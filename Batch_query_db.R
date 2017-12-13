@@ -100,7 +100,7 @@ utmStr <- "+proj=utm +zone=%d +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs
 pUTM <- spTransform(bq, CRS(sprintf(utmStr, 10))) # UTM in hard code number, might need to fix in the future
 
 # Need to check this part
-proxRd <- gDistance(pUTM, rd_trans)
+proxRd <- apply(gDistance(pUTM, rd_trans, byid=TRUE), 2, min)
 ID <- bq$ID
 
 bq_df <- data.frame(ID, bq_fc, PopDensity, NO2, PM25, proxRd)
