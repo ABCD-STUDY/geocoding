@@ -60,24 +60,27 @@ crs(bq) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 # define region first
 bq_fc <- over(bq, fc_clean)
 t <- data.frame(table(as.character(bq_fc$CBSA_Name)))
-fc_grep <- fc_clean[grep(as.character(t$Var1[which(t$Freq > 1)]), fc_clean@data$CBSA_Name), ]
 
+for (geo_id in t$Var1){
+
+fc_grep <- fc_clean[which(is.element(fc_clean@data$CBSA_Name, as.character(geo_id))), ]
 ext <- extent(fc_grep)
 r <- raster(fc_grep, nrow=round(abs(ext[1] - ext[2])/0.03),
             ncol=round(abs(ext[3] - ext[4])/0.03))
 nc <- rasterize(coordinates(bq), r, fun='count')
 rbPal <- colorRampPalette(c('yellow','red'),alpha=TRUE)
-
-
-png(paste0(outputcsv,'sampling.density.png'))
+png(paste0(outputcsv,'.',gsub(" |,", ".", geo_id),'sampling.density.png'))
 plot(fc_grep, border=rgb(0.5,0.5,0.5,0.2))
 plot(nc, col=adjustcolor(rbPal(5),alpha.f = 0.7), add=TRUE)
 title(paste0(inputcsv, '\r\n', 
-             'Sampling Density','\r\n',
-             'n = ',dim(bq)[1]))
+             as.character(geo_id), ' Sampling Density','\r\n',
+             'n = ', t$Freq[grep(as.character(geo_id), t$Var1)]))
 dev.off()
-
+}
 write.table(t, file=paste0(outputcsv,'.sampling.counts'), quote=FALSE, row.names=FALSE)
+
+GEO10 <- data.frame(table(substr(as.character(bq_fc$GEOID10), 1,10)))
+write.table(GEO10, file=paste0(outputcsv,'.geo10.counts'), quote=FALSE, row.names=FALSE)
 
 
 
