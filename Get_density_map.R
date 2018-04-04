@@ -77,3 +77,7 @@ title(paste0(inputcsv, '\r\n',
              'n = ',dim(bq)[1]))
 dev.off()
 
+write.table(t, file=paste0(outputcsv,'.sampling.counts'), quote=FALSE, row.names=FALSE)
+
+
+
