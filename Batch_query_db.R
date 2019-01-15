@@ -17,6 +17,7 @@ suppressMessages(library(rgeos))
 suppressMessages(library(rgdal))
 suppressMessages(library(maptools))
 suppressMessages(library(dplyr))
+suppressMessages(library(FNN))
 
 # Variable command line
 args = commandArgs(trailingOnly=TRUE)
@@ -53,7 +54,7 @@ draster <- raster(paste0(dpath, '/', flist),  values=TRUE)
 draster <- crop(draster, extent(-180, -40, 10,72))
 
 cat('Checking database of raster PM2.5')
-flist <- dir(dpath, pattern = 'PM')
+flist <- dir(dpath, pattern = 'PM25_2010')
 nfile <- length(flist)
 if (nfile == 1){
   cat(paste0('  -- ', flist, '\n'))
@@ -74,6 +75,15 @@ if (nfile == 1){
 }
 no2 <- crop(raster(paste0(dpath, '/', flist)), extent(-180, -40, 0,72))
 
+# Legality as additional module
+# Currently not integrated in the data batch until the final part is verified
+law <- read.table(paste0(dpath, '/State_cannabis_use_laws.csv'), header=TRUE, sep='\t')
+names(law)[1] <- 'Name'
+lawfips <- read.csv(paste0(dpath, '/stat_SFIPS.csv'), header=TRUE)
+law <- left_join(lawfips, law)
+law <- law[,c(3,5:dim(law)[2])]
+law$SFIPS <- sprintf('%02d',law$SFIPS)
+
 # Input spreadsheet
 # Current version is using a csv spreadsheet
 # First column is ID, second column is Longitude, and the third is the latitude
@@ -84,26 +94,46 @@ cat(paste0('Cannot locate ', inputcsv,', please check \n'))
 stop("", call.=FALSE)
 }
 
+# REading new pollution data
+cat(paste0('Reading supplement pollution data \n'))
+gridsite <- readRDS(paste0(dpath, "/USGridSite.Rds"))
+avg_pm2.5<- readRDS(paste0(dpath, "/PredictionStep2_Annual_PM25_USGrid_20160101_20161231.rds"))
+
+
+#############################################################
+###  Begin to query
+############################################################
+ 
 flist <- dir(inputcsv)
 cat(paste0('Reading ', inputcsv, '\n'))
 bq <- read.csv(inputcsv, header=TRUE, as.is=TRUE)
+dist <- get.knnx(gridsite[,c("Lat","Lon")], bq[,c("Latitude","Longitude")], k=1) ## calculate distance matrix
+grid_id<-dist$nn.index   ###extract grid id of 21 sites ---id-s are identical of the avg_pm2.5 
 
 coordinates(bq) <- ~ Longitude + Latitude
 crs(bq) <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 
+print('Step 1: query SES maps')
 bq_fc <- over(bq, fc_clean)
+bq_fc <- left_join(bq_fc, law)
 bq_fc <- bq_fc[,5:dim(bq_fc)[2]]
+
 PopDensity <- extract(draster, bq)
+print('Step 2: extract pollutant maps')
 NO2 <- extract(no2, bq)
 PM25 <- extract(pm25, bq)
+PM25_supp <- avg_pm2.5[grid_id]  ###extract PM2.5 concentrations of the 21 sites according to their grid id-s and assign them to the original dataset with the addresses
+
 utmStr <- "+proj=utm +zone=%d +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 pUTM <- spTransform(bq, CRS(sprintf(utmStr, 10))) # UTM in hard code number, might need to fix in the future
 
 # Need to check this part
+print('Step 3: project distance')
 proxRd <- apply(gDistance(pUTM, rd_trans, byid=TRUE), 2, min)
 ID <- bq$ID
 
-bq_df <- data.frame(ID, bq_fc, PopDensity, NO2, PM25, proxRd)
+# bq_df <- data.frame(ID, bq_fc, PopDensity, NO2, PM25, proxRd)
+bq_df <- data.frame(ID, bq_fc, PopDensity, NO2, PM25, proxRd, PM25_supp)
 
 # Writing output
 cat(paste0('Writing ', outputcsv, '\n'))
