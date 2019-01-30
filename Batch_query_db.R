@@ -75,6 +75,9 @@ if (nfile == 1){
 }
 no2 <- crop(raster(paste0(dpath, '/', flist)), extent(-180, -40, 0,72))
 
+# Getting data of Lead risks based on VOX model
+load(paste0(dpath, '/VOXLeadRisk.rda'))
+
 # Legality as additional module
 # Currently not integrated in the data batch until the final part is verified
 law <- read.table(paste0(dpath, '/State_cannabis_use_laws.csv'), header=TRUE, sep='\t')
@@ -132,8 +135,15 @@ print('Step 3: project distance')
 proxRd <- apply(gDistance(pUTM, rd_trans, byid=TRUE), 2, min)
 ID <- bq$ID
 
+# Get the lead risks
+Pb = fc_clean['GEOID10']
+Pb@data$FIPS <- substr(Pb@data$GEOID10,1,11)
+Pb@data <- left_join(Pb@data, df2)
+bq_pb <- over(bq, Pb)
+
+
 # bq_df <- data.frame(ID, bq_fc, PopDensity, NO2, PM25, proxRd)
-bq_df <- data.frame(ID, bq_fc, PopDensity, NO2, PM25, proxRd, PM25_supp)
+bq_df <- data.frame(ID, bq_fc, PopDensity, NO2, PM25, proxRd, PM25_supp, leadrisk_poverty=bq_pb$PovertyRisk, leadrisk_housing=bq_pb$HousingRisk, leadrisk=bq_pb$LeadRisk)
 
 # Writing output
 cat(paste0('Writing ', outputcsv, '\n'))
